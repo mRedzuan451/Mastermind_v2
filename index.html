@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MASTERMIND</title>
+    <!-- Google Fonts for the retro theme -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Custom Tailwind theme configuration to match the retro terminal look
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'vt323': ['VT323', 'monospace'],
+                        'press-start': ['"Press Start 2P"', 'cursive'],
+                        'roboto-mono': ['"Roboto Mono"', 'monospace'],
+                    },
+                    colors: {
+                        'terminal-green': '#0abb3a',
+                        'terminal-amber': '#d89300',
+                        'terminal-bg': '#0d0d0d',
+                        'terminal-red': '#bb0a0a',
+                    },
+                    boxShadow: {
+                        'glow-green': '0 0 3px #0abb3a, 0 0 6px #0abb3a, 0 0 9px #0abb3a',
+                        'glow-amber': '0 0 3px #d89300, 0 0 6px #d89300, 0 0 9px #d89300',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom animations and styles for the terminal aesthetic */
+        @keyframes pulse-glow {
+            0%, 100% { text-shadow: 0 0 4px #0abb3a, 0 0 8px #0abb3a; }
+            50% { text-shadow: 0 0 8px #0abb3a, 0 0 12px #0abb3a, 0 0 16px #0abb3a; }
+        }
+        .animated-logo { animation: pulse-glow 3s ease-in-out infinite; }
+        .scanlines::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(0,0,0,0.4) 1px, transparent 1px);
+            background-size: 100% 3px; pointer-events: none; z-index: 10;
+        }
+        .terminal-button {
+            background-color: transparent; border: 2px solid #0abb3a; color: #0abb3a;
+            padding: 10px 20px; font-family: 'VT323', monospace; font-size: 1.25rem;
+            text-transform: uppercase; transition: all 0.2s ease-in-out; box-shadow: 0 0 5px #0abb3a;
+        }
+        .terminal-button:hover:not(:disabled) { background-color: #0abb3a; color: #0d0d0d; box-shadow: 0 0 15px #0abb3a; }
+        .terminal-button:disabled { border-color: #4a4a4a; color: #4a4a4a; cursor: not-allowed; box-shadow: none; }
+        .terminal-input {
+            background-color: #1a1a1a; border: 2px solid #0abb3a; color: #0abb3a;
+            padding: 10px; font-family: 'VT323', monospace; font-size: 1.25rem; width: 100%;
+        }
+        .terminal-input:focus { outline: none; box-shadow: 0 0 10px #0abb3a; }
+        .modal { background-color: rgba(13, 13, 13, 0.9); border: 2px solid #0abb3a; box-shadow: 0 0 20px #0abb3a; }
+        .digit-reveal { opacity: 0; transform: translateY(-20px); animation: reveal 0.5s forwards; }
+        @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+        .kick-button {
+            background-color: #aa2222; color: white; border: none; font-size: 0.75rem;
+            border-radius: 50%; width: 1.25rem; height: 1.25rem; line-height: 1.25rem;
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .kick-button:hover { background-color: #ff4444; }
+        .guess-number-display {
+            font-family: 'Roboto Mono', monospace;
+            letter-spacing: 0.2em;
+        }
+    </style>
+</head>
+<body class="bg-terminal-bg text-terminal-green font-vt323 text-lg min-h-screen flex flex-col items-center justify-center p-4 scanlines">
+
+    <div id="app-container" class="w-full max-w-5xl mx-auto">
+        <!-- Lobby Screen: Initial view for players -->
+        <div id="lobby-screen" class="text-center">
+            <h1 class="text-7xl md:text-8xl font-press-start animated-logo mb-4">MASTERMIND</h1>
+            <p class="text-2xl text-terminal-amber mb-8">"Crack the code. Claim the glory."</p>
+            
+            <!-- Authentication Container -->
+            <div id="auth-container">
+                <div id="sign-in-prompt" class="flex flex-col items-center">
+                    <p class="text-xl mb-4">Sign in to play</p>
+                    <button id="sign-in-btn" class="terminal-button">
+                        <span class="flex items-center">
+                            <svg class="w-6 h-6 mr-3" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C42.021,35.596,44,30.138,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                            Sign in with Google
+                        </span>
+                    </button>
+                </div>
+
+                <div id="user-info" class="hidden flex flex-col items-center">
+                    <div class="flex items-center mb-4">
+                        <img id="user-avatar" class="w-12 h-12 rounded-full border-2 border-terminal-green mr-4" src="" alt="User Avatar" onerror="this.src='https://placehold.co/48x48/0d0d0d/0abb3a?text=A'">
+                        <div>
+                            <div id="display-name-container" class="flex items-center">
+                                <p>Welcome, <span id="user-name" class="text-white font-bold"></span></p>
+                                <button id="edit-name-btn" class="ml-2 text-terminal-amber text-sm hover:underline">[Edit]</button>
+                            </div>
+                            <div id="edit-name-container" class="hidden">
+                                 <input type="text" id="edit-name-input" class="terminal-input text-base p-1 w-40">
+                                 <button id="save-name-btn" class="ml-2 text-terminal-green text-sm">[Save]</button>
+                                 <button id="cancel-edit-btn" class="ml-1 text-red-500 text-sm">[X]</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="sign-out-btn" class="terminal-button text-sm">Sign Out</button>
+                </div>
+            </div>
+
+            <!-- Game Mode Selection -->
+            <div id="mode-selection-screen" class="hidden mt-8 max-w-md mx-auto space-y-4">
+                <button id="single-player-btn" class="terminal-button w-full">Single Player</button>
+                <button id="multiplayer-btn" class="terminal-button w-full">Multiplayer</button>
+            </div>
+
+            <!-- Public Games Lobby -->
+            <div id="public-lobby-screen" class="hidden mt-8 max-w-2xl mx-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-3xl font-press-start text-terminal-amber">Public Games</h2>
+                    <div class="flex items-center gap-2">
+                        <button id="clear-stale-lobbies-btn" class="terminal-button text-base !p-2 hidden" title="Clean Stale Lobbies">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                            </svg>
+                        </button>
+                        <button id="refresh-lobby-btn" class="terminal-button text-base !p-2" title="Refresh List">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="public-games-list" class="bg-black bg-opacity-50 p-4 border-2 border-terminal-green/50 h-64 overflow-y-auto mb-6">
+                    <!-- Public games will be dynamically inserted here -->
+                </div>
+                <div class="space-y-4 max-w-md mx-auto">
+                    <button id="create-game-btn" class="terminal-button w-full">Create New Game</button>
+                    <div class="flex space-x-2">
+                        <input type="text" id="join-game-input" placeholder="Or Join by ID..." class="terminal-input flex-grow">
+                        <button id="join-game-btn" class="terminal-button">Join</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Menu Buttons -->
+            <div class="mt-12 space-x-4">
+                <button id="how-to-play-btn" class="terminal-button">How to Play</button>
+                <button id="my-stats-btn" class="terminal-button">My Stats</button>
+                <button id="leaderboard-btn" class="terminal-button">Leaderboard</button>
+                <button id="mute-btn" class="terminal-button">Mute</button>
+            </div>
+        </div>
+
+        <!-- Game Screen: Main gameplay view -->
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <div class="flex items-center gap-4">
+                        <h2 id="lobby-code-header" class="text-4xl font-press-start">Lobby Code: <span id="game-id-display" class="text-terminal-amber"></span></h2>
+                        <button id="copy-game-id-btn" class="terminal-button text-sm !p-2" title="Copy Lobby Code">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p>Round: <span id="round-display" class="text-white"></span> | Turn Timer: <span id="timer-display" class="text-terminal-amber text-2xl">30</span></p>
+                </div>
+                <button id="game-mute-btn" class="terminal-button">Mute</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Main Game Area (Left/Center) -->
+                <div class="md:col-span-2 flex flex-col gap-4">
+                    <!-- Game Board -->
+                    <div class="bg-black bg-opacity-50 p-4 border-2 border-terminal-green/50">
+                        <h3 class="text-2xl border-b-2 border-terminal-green/50 mb-4 pb-2">GUESS HISTORY</h3>
+                        <div id="guess-history" class="space-y-3 h-80 md:h-96 overflow-y-auto pr-2">
+                            <!-- Guesses will be dynamically inserted here -->
+                        </div>
+                        <div id="secret-code-reveal" class="mt-4 text-center hidden">
+                            <h3 class="text-2xl text-terminal-amber">CODE REVEALED</h3>
+                            <div id="secret-code-container" class="text-4xl font-bold mt-2 guess-number-display"></div>
+                        </div>
+                    </div>
+                     <!-- Game Controls -->
+                    <div id="game-controls" class="bg-black bg-opacity-50 p-4 border-2 border-terminal-green/50">
+                        <p id="turn-status" class="text-xl mb-2 text-center"></p>
+                        <div id="input-area" class="flex space-x-2">
+                            <input type="text" id="guess-input" class="terminal-input flex-grow" disabled>
+                            <button id="request-hint-btn" class="terminal-button" disabled>Hint</button>
+                            <button id="submit-guess-btn" class="terminal-button" disabled>Guess</button>
+                        </div>
+                        <p id="input-error" class="text-red-500 h-5 mt-1"></p>
+                    </div>
+                </div>
+
+                <!-- Player Info & Master Controls Area (Right) -->
+                <div id="player-info-panel" class="bg-black bg-opacity-50 p-4 border-2 border-terminal-green/50">
+                    <h3 class="text-2xl border-b-2 border-terminal-green/50 mb-4 pb-2">PLAYERS</h3>
+                    <div id="player-list" class="space-y-2 mb-6">
+                        <!-- Player list will be dynamically inserted here -->
+                    </div>
+                    
+                    <div id="master-controls" class="mt-6 space-y-3 hidden">
+                         <h3 class="text-2xl border-b-2 border-terminal-green/50 mb-4 pb-2">MASTER CONTROLS</h3>
+                         <div id="set-code-container">
+                            <input type="text" id="set-code-input" class="terminal-input mb-2" placeholder="Set code (optional)">
+                         </div>
+                        <button id="start-game-btn" class="terminal-button w-full">Start Game</button>
+                        <button id="next-round-btn" class="terminal-button w-full">Next Round</button>
+                        <button id="back-to-lobby-btn" class="terminal-button w-full">Back to Lobby</button>
+                        <button id="end-game-btn" class="terminal-button w-full !border-terminal-red !text-terminal-red hover:!bg-terminal-red hover:!text-terminal-bg">End Game</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="game-over-screen" class="hidden absolute inset-0 bg-terminal-bg/95 flex flex-col items-center justify-center text-center z-20">
+                <h2 class="text-6xl font-press-start text-terminal-amber mb-8">GAME OVER</h2>
+                <div id="final-scores" class="text-3xl space-y-4 mb-8"></div>
+                <p class="text-4xl mb-8">Winner: <span id="final-winner" class="text-terminal-green"></span></p>
+                <div id="game-over-controls" class="mt-8">
+                    <!-- Master Controls -->
+                    <div id="master-game-over-controls" class="hidden space-x-4">
+                        <button id="play-again-btn-master" class="terminal-button text-2xl">Play Again</button>
+                        <button id="exit-game-btn" class="terminal-button text-2xl !border-terminal-red !text-terminal-red hover:!bg-terminal-red hover:!text-terminal-bg">Exit & Close Lobby</button>
+                    </div>
+                    <!-- Single Player Controls -->
+                    <button id="play-again-btn-sp" class="terminal-button text-2xl hidden">Play Again</button>
+                    <!-- Guest Message -->
+                    <p id="play-again-wait-msg" class="text-xl hidden">Waiting for the Master to make a decision...</p>
+                </div>
+            </div>
+
+        </div>
+        
+        <!-- Settings Panel (for Master) -->
+        <div id="settings-panel" class="hidden bg-black bg-opacity-50 p-4 border-2 border-terminal-green/50 mt-4 max-w-md mx-auto">
+            <h3 class="text-2xl border-b-2 border-terminal-green/50 mb-4 pb-2 text-center">GAME SETTINGS</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label for="code-length">Code Length:</label>
+                    <input type="number" id="code-length" min="3" max="8" value="4" class="terminal-input w-24 text-center">
+                </div>
+                <div class="flex justify-between items-center">
+                    <label for="num-rounds">Number of Rounds:</label>
+                    <input type="number" id="num-rounds" min="1" max="10" value="3" class="terminal-input w-24 text-center">
+                </div>
+                <div class="flex justify-between items-center">
+                    <label for="turn-timer">Turn Timer (seconds):</label>
+                    <input type="number" id="turn-timer" min="10" max="120" value="30" class="terminal-input w-24 text-center">
+                </div>
+                <div class="flex justify-between items-center">
+                    <label for="advanced-mode">Advanced Mode (Allow Duplicates):</label>
+                    <input type="checkbox" id="advanced-mode" class="w-6 h-6">
+                </div>
+                <div class="flex justify-between items-center">
+                    <label for="allow-hints">Allow Hints:</label>
+                    <input type="checkbox" id="allow-hints" class="w-6 h-6" checked>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label for="unlimited-rounds">Unlimited Rounds:</label>
+                    <input type="checkbox" id="unlimited-rounds" class="w-6 h-6">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="how-to-play-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="modal w-full max-w-2xl p-6 text-lg relative">
+            <button class="absolute top-2 right-4 text-4xl text-terminal-green hover:text-white" onclick="toggleModal('how-to-play-modal', false)">&times;</button>
+            <h2 class="text-3xl font-press-start text-center mb-6 text-terminal-amber">How to Play</h2>
+            <p class="mb-4">Welcome to MASTERMIND. One player, the <span class="text-terminal-amber">Master</span>, sets a secret code of digits. The other players, the <span class="text-terminal-amber">Guests</span>, must guess the code.</p>
+            <p class="mb-4">After each guess, you'll get feedback:</p>
+            <ul class="list-disc list-inside mb-4 space-y-2">
+                <li><span class="text-green-500 font-bold">BULL (Green Peg):</span> Correct digit in the correct position.</li>
+                <li><span class="text-yellow-500 font-bold">COW (Yellow Peg):</span> Correct digit in the wrong position.</li>
+            </ul>
+            <p class="mb-4">The available digits are <span class="font-bold">0, 1, 2, 3, 4, 5, 6, 7, 8, 9</span>. Enter a sequence of digits for your guess.</p>
+            <p class="mb-4">The round ends if the code isn't cracked after each guesser has had a number of turns equal to twice the code's length. If this happens, the Master wins the round.</p>
+            <p class="mb-4">The player who guesses the code in the fewest attempts wins the round. Scores accumulate over multiple rounds.</p>
+            <h3 class="text-2xl text-terminal-amber mt-6 mb-2">Advanced Mode</h3>
+            <p>If enabled by the Master, the secret code may contain <span class="font-bold">duplicate digits</span>, making the challenge significantly harder.</p>
+            <h3 class="text-2xl text-terminal-amber mt-6 mb-2">Hints</h3>
+            <p>If you're stuck, you can request a hint! Hints are only available for 4 and 5-digit codes.</p>
+            <ul class="list-disc list-inside mt-2 space-y-2">
+                <li>Using a hint costs you your turn.</li>
+                <li>The hint will reveal one correct digit that is in the code, but not its position.</li>
+                <li>After using a hint, you must wait for 2 of your own turns before you can use it again.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="modal w-full max-w-2xl p-6 text-lg relative">
+            <button class="absolute top-2 right-4 text-4xl text-terminal-green hover:text-white" onclick="toggleModal('leaderboard-modal', false)">&times;</button>
+            <h2 class="text-3xl font-press-start text-center mb-6 text-terminal-amber">Leaderboard</h2>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b-2 border-terminal-green/50">
+                        <th class="p-2">Player</th>
+                        <th class="p-2 text-center">Wins</th>
+                        <th class="p-2 text-center">Games Played</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- Stats will be dynamically inserted here -->
+                </tbody>
+            </table>
+            <div class="text-center mt-6">
+                <button id="clear-stats-btn" class="terminal-button hidden">Clear All Stats (Admin)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personal Stats Modal -->
+    <div id="personal-stats-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="modal w-full max-w-lg p-6 text-lg relative">
+            <button class="absolute top-2 right-4 text-4xl text-terminal-green hover:text-white" onclick="toggleModal('personal-stats-modal', false)">&times;</button>
+            <h2 class="text-3xl font-press-start text-center mb-6 text-terminal-amber">My Stats</h2>
+            <div class="space-y-4 text-2xl">
+                <div class="flex justify-between"><span>Wins:</span> <span id="stats-wins" class="text-white">0</span></div>
+                <div class="flex justify-between"><span>Games Played:</span> <span id="stats-games" class="text-white">0</span></div>
+                <div class="flex justify-between"><span>Win Rate:</span> <span id="stats-win-rate" class="text-white">0%</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div class="modal w-full max-w-md p-6 text-lg relative text-center">
+            <h2 id="confirm-title" class="text-2xl font-press-start mb-4 text-terminal-amber">Are you sure?</h2>
+            <p id="confirm-message" class="mb-6"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-yes-btn" class="terminal-button">Yes</button>
+                <button id="confirm-no-btn" class="terminal-button !border-terminal-red !text-terminal-red hover:!bg-terminal-red hover:!text-terminal-bg">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 bg-terminal-amber text-terminal-bg font-bold p-4 rounded-lg shadow-glow-amber z-50">
+        <p id="toast-message"></p>
+    </div>
+
+    <!-- Confetti Canvas for celebrations -->
+    <canvas id="confetti-canvas" class="fixed top-0 left-0 w-full h-full pointer-events-none z-50"></canvas>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, updateProfile, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, collection, getDocs, writeBatch, deleteDoc, runTransaction, deleteField, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getDatabase, ref, onValue, set, onDisconnect, serverTimestamp, get } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAq7pMiRdaHgQTyooKf0XZIobceHz86MNs",
+            authDomain: "mastermindv2-893d6.firebaseapp.com",
+            projectId: "mastermindv2-893d6",
+            storageBucket: "mastermindv2-893d6.firebasestorage.app",
+            messagingSenderId: "731333560205",
+            appId: "1:731333560205:web:8c580d61222c4babea9fc4",
+            databaseURL: "https://mastermindv2-893d6-default-rtdb.firebaseio.com"
+        };
+        
+        // This ID is used for structuring data in Firestore in a shared environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-mastermind';
+        
+        // IMPORTANT: Replace this with your own Firebase User ID (UID) to get admin privileges
+        // like clearing the leaderboard. You can find your UID after signing in to the app once.
+        const ADMIN_UID = "73bpK9W9Y0Nmd9Z926ltuedtn5e2";
+        
+        // --- GLOBAL VARIABLES ---
+        let app, auth, db, rtdb;
+        let userId;
+        let gameUnsubscribe, publicGamesUnsubscribe;
+        let currentGameState = {};
+        let turnTimerInterval;
+        let isMuted = false;
+        let sounds = {};
+        let confirmCallback = null;
+        
+        const DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+        // --- DOM ELEMENT CACHING ---
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const signInPrompt = document.getElementById('sign-in-prompt');
+        const userInfo = document.getElementById('user-info');
+        const modeSelectionScreen = document.getElementById('mode-selection-screen');
+        const publicLobbyScreen = document.getElementById('public-lobby-screen');
+        const publicGamesList = document.getElementById('public-games-list');
+        const createGameBtn = document.getElementById('create-game-btn');
+        const joinGameInput = document.getElementById('join-game-input');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const gameIdDisplay = document.getElementById('game-id-display');
+        const guessHistory = document.getElementById('guess-history');
+        const playerList = document.getElementById('player-list');
+        const turnStatus = document.getElementById('turn-status');
+        const guessInput = document.getElementById('guess-input');
+        const submitGuessBtn = document.getElementById('submit-guess-btn');
+        const requestHintBtn = document.getElementById('request-hint-btn');
+        const inputError = document.getElementById('input-error');
+        const masterControls = document.getElementById('master-controls');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const nextRoundBtn = document.getElementById('next-round-btn');
+        const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
+        const endGameBtn = document.getElementById('end-game-btn');
+        const timerDisplay = document.getElementById('timer-display');
+        const roundDisplay = document.getElementById('round-display');
+        const secretCodeReveal = document.getElementById('secret-code-reveal');
+        const secretCodeContainer = document.getElementById('secret-code-container');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScores = document.getElementById('final-scores');
+        const finalWinner = document.getElementById('final-winner');
+        const playAgainWaitMsg = document.getElementById('play-again-wait-msg');
+        const setCodeContainer = document.getElementById('set-code-container');
+        const setCodeInput = document.getElementById('set-code-input');
+        const refreshLobbyBtn = document.getElementById('refresh-lobby-btn');
+        const playerInfoPanel = document.getElementById('player-info-panel');
+        const lobbyCodeHeader = document.getElementById('lobby-code-header');
+        const copyGameIdBtn = document.getElementById('copy-game-id-btn');
+        const clearStaleLobbiesBtn = document.getElementById('clear-stale-lobbies-btn');
+        
+        // --- SOUND SETUP ---
+        function setupSounds() {
+            sounds.click = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.submit = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }).toDestination();
+            sounds.error = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.bull = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.2, release: 0.1 } }).toDestination();
+            sounds.cow = new Tone.Synth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            sounds.win = new Tone.MembraneSynth().toDestination();
+            sounds.music = new Tone.AMSynth({
+                harmonicity: 1.5,
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.2, decay: 0.01, sustain: 1, release: 0.5 }
+            }).toDestination();
+            sounds.music.volume.value = -25;
+            
+            sounds.musicLoop = new Tone.Loop(time => {
+                const notes = ['C2', 'E2', 'G2', 'B2'];
+                const note = notes[Math.floor(Math.random() * notes.length)];
+                sounds.music.triggerAttackRelease(note, '8n', time);
+            }, '4n').start(0);
+        }
+        
+        function playSound(sound, note = 'C4', duration = '8n') {
+            if (isMuted || !sounds[sound]) return;
+            try {
+                sounds[sound].triggerAttackRelease(note, duration);
+            } catch (e) {
+                console.error(`Sound error: ${e}`);
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').textContent = isMuted ? 'Unmute' : 'Mute';
+            document.getElementById('game-mute-btn').textContent = isMuted ? 'Unmute' : 'Mute';
+            if (isMuted) {
+                if (Tone.Transport.state === 'started') Tone.Transport.pause();
+            } else {
+                if (Tone.Transport.state === 'paused') Tone.Transport.start();
+            }
+        }
+
+        // --- UI & MODALS ---
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        window.toggleModal = (modalId, show) => {
+            playSound('click');
+            const modal = document.getElementById(modalId);
+            if (show) {
+                modal.classList.remove('hidden');
+                if (modalId === 'leaderboard-modal') renderLeaderboard();
+                if (modalId === 'personal-stats-modal') renderPersonalStats();
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        function showConfirmModal(message, onConfirm) {
+            toggleModal('confirm-modal', true);
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = onConfirm;
+        }
+        
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const myConfetti = confetti.create(canvas, { resize: true });
+            myConfetti({ particleCount: 200, spread: 160, origin: { y: 0.6 } });
+        }
+
+        // --- FIREBASE & AUTH ---
+        async function initialize() {
+            // Use provided firebase config if available, otherwise use the placeholder
+            const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+
+            if (!finalFirebaseConfig || !finalFirebaseConfig.apiKey || finalFirebaseConfig.apiKey === "YOUR_API_KEY") {
+                console.error("Firebase config is missing or is a placeholder. Please paste your config object from the Firebase Console.");
+                showToast("CRITICAL ERROR: Firebase configuration is missing.");
+                document.querySelectorAll('button, input').forEach(el => el.disabled = true);
+                signInPrompt.innerHTML = '<p class="text-terminal-red">APP OFFLINE: FIREBASE NOT CONFIGURED</p>';
+                return;
+            }
+
+            app = initializeApp(finalFirebaseConfig);
+            db = getFirestore(app);
+            rtdb = getDatabase(app);
+            auth = getAuth(app);
+
+            // Sign in using a provided token if it exists
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                }
+            } catch (error) {
+                console.error("Error signing in with custom token:", error);
+                showToast("Automatic authentication failed.");
+            }
+
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    userId = user.uid;
+                    signInPrompt.classList.add('hidden');
+                    userInfo.classList.remove('hidden');
+                    modeSelectionScreen.classList.remove('hidden');
+                    
+                    document.getElementById('user-name').textContent = user.displayName || 'Anonymous User';
+                    document.getElementById('user-avatar').src = user.photoURL || `https://placehold.co/48x48/0d0d0d/0abb3a?text=${(user.displayName || 'A').charAt(0)}`;
+                    
+                    managePresence(user.uid);
+                    setupGameActionListeners();
+                } else {
+                    userId = null;
+                    signInPrompt.classList.remove('hidden');
+                    userInfo.classList.add('hidden');
+                    modeSelectionScreen.classList.add('hidden');
+                    publicLobbyScreen.classList.add('hidden');
+                    
+                    if (publicGamesUnsubscribe) publicGamesUnsubscribe();
+                    if (gameScreen.classList.contains('hidden') === false) {
+                        leaveGame();
+                    }
+                }
+                clearStaleLobbiesBtn.classList.toggle('hidden', userId !== ADMIN_UID);
+            });
+            
+            setupSounds();
+            setupGlobalListeners();
+        }
+
+        function managePresence(uid) {
+            const userStatusDatabaseRef = ref(rtdb, `/status/${uid}`);
+            const isOfflineForDatabase = { state: 'offline', last_changed: serverTimestamp() };
+            const isOnlineForDatabase = { state: 'online', last_changed: serverTimestamp() };
+
+            const connectedRef = ref(rtdb, '.info/connected');
+            onValue(connectedRef, (snap) => {
+                if (snap.val() === false) return;
+                
+                onDisconnect(userStatusDatabaseRef).set(isOfflineForDatabase).then(() => {
+                    set(userStatusDatabaseRef, isOnlineForDatabase);
+                });
+            });
+            
+            // Listen for user status changes to clean up games
+            onValue(userStatusDatabaseRef, (snap) => {
+                const userStatus = snap.val();
+                if (userStatus?.state === 'offline') {
+                    const gamesRef = collection(db, `artifacts/${appId}/public/data/mastermind_games`);
+                    const q = query(gamesRef, where("gameState.masterId", "==", uid));
+                    
+                    getDocs(q).then(snapshot => {
+                        snapshot.forEach(gameDoc => {
+                            // If the game is in the lobby, mark the master as offline
+                            if (gameDoc.data().gameState.status === 'lobby') {
+                                updateDoc(gameDoc.ref, { 'masterOnline': false });
+                            } else {
+                                // If the game is in progress, delete it
+                                deleteDoc(gameDoc.ref);
+                            }
+                        });
+                    });
+                }
+            });
+        }
+        
+        function setupGlobalListeners() {
+            document.getElementById('sign-in-btn').onclick = signInWithGoogle;
+            document.getElementById('sign-out-btn').onclick = signOutUser;
+            document.getElementById('how-to-play-btn').onclick = () => toggleModal('how-to-play-modal', true);
+            document.getElementById('leaderboard-btn').onclick = () => toggleModal('leaderboard-modal', true);
+            document.getElementById('my-stats-btn').onclick = () => toggleModal('personal-stats-modal', true);
+            document.getElementById('mute-btn').onclick = toggleMute;
+            document.getElementById('game-mute-btn').onclick = toggleMute;
+            document.getElementById('clear-stats-btn').onclick = clearLeaderboard;
+            clearStaleLobbiesBtn.onclick = clearStaleLobbies;
+            refreshLobbyBtn.onclick = () => {
+                playSound('click');
+                listenForPublicGames();
+                showToast("Refreshed lobby list.");
+            };
+            
+            // Listeners for editing username
+            const editNameBtn = document.getElementById('edit-name-btn');
+            const saveNameBtn = document.getElementById('save-name-btn');
+            const cancelEditBtn = document.getElementById('cancel-edit-btn');
+            const editNameInput = document.getElementById('edit-name-input');
+            const displayNameContainer = document.getElementById('display-name-container');
+            const editNameContainer = document.getElementById('edit-name-container');
+
+            editNameBtn.onclick = () => {
+                displayNameContainer.classList.add('hidden');
+                editNameContainer.classList.remove('hidden');
+                editNameInput.value = auth.currentUser.displayName;
+                editNameInput.focus();
+            };
+            cancelEditBtn.onclick = () => {
+                displayNameContainer.classList.remove('hidden');
+                editNameContainer.classList.add('hidden');
+            };
+            saveNameBtn.onclick = () => {
+                const newName = editNameInput.value.trim();
+                updateUsername(newName);
+            };
+
+            // Listeners for confirmation modal
+            document.getElementById('confirm-yes-btn').onclick = () => {
+                if (confirmCallback) {
+                    confirmCallback();
+                    confirmCallback = null;
+                }
+                toggleModal('confirm-modal', false);
+            };
+            document.getElementById('confirm-no-btn').onclick = () => {
+                confirmCallback = null;
+                toggleModal('confirm-modal', false);
+            };
+        }
+
+        async function updateUsername(newName) {
+            if (!newName) {
+                showToast("Name cannot be empty.");
+                playSound('error');
+                return;
+            }
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await updateProfile(user, { displayName: newName });
+                showToast("Username updated!");
+                playSound('submit');
+                document.getElementById('user-name').textContent = newName;
+                document.getElementById('edit-name-container').classList.add('hidden');
+                document.getElementById('display-name-container').classList.remove('hidden');
+                if (currentGameState.id && currentGameState.players[userId]) {
+                    const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+                    await updateDoc(gameRef, { [`players.${userId}.name`]: newName });
+                }
+            } catch (error) {
+                console.error("Error updating username:", error);
+                showToast("Failed to update username.");
+                playSound('error');
+            }
+        }
+
+        async function signInWithGoogle() {
+            playSound('click');
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+            }
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google Sign-In failed:", error);
+                showToast(`Sign-In Error: ${error.message}`);
+            }
+        }
+
+        async function signOutUser() {
+            playSound('click');
+            const userStatusDatabaseRef = ref(rtdb, `/status/${auth.currentUser.uid}`);
+            await set(userStatusDatabaseRef, { state: 'offline', last_changed: serverTimestamp() });
+            await signOut(auth);
+        }
+
+        function setupGameActionListeners() {
+            document.getElementById('single-player-btn').onclick = createSinglePlayerGame;
+            document.getElementById('multiplayer-btn').onclick = () => {
+                modeSelectionScreen.classList.add('hidden');
+                publicLobbyScreen.classList.remove('hidden');
+                listenForPublicGames();
+            };
+
+            createGameBtn.onclick = createGame;
+            joinGameBtn.onclick = () => joinGame(joinGameInput.value.trim().toUpperCase());
+            submitGuessBtn.onclick = submitGuess;
+            requestHintBtn.onclick = requestHint;
+            guessInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') submitGuess(); });
+            
+            startGameBtn.onclick = startGame;
+            nextRoundBtn.onclick = () => startNextRound();
+            backToLobbyBtn.onclick = () => resetGame(true, userId);
+            endGameBtn.onclick = endGameByMaster;
+            
+            // Game Over Screen Listeners
+            document.getElementById('play-again-btn-master').onclick = (e) => {
+                const winnerId = e.currentTarget.dataset.winnerId;
+                resetGame(true, winnerId);
+            };
+            document.getElementById('play-again-btn-sp').onclick = createSinglePlayerGame;
+            document.getElementById('exit-game-btn').onclick = endGameByMaster;
+
+            playerList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('kick-button')) kickPlayer(e.target.dataset.playerId);
+                if (e.target.classList.contains('ready-btn')) togglePlayerReady();
+                if (e.target.classList.contains('make-master-btn')) assignNewMaster(e.target.dataset.playerId);
+            });
+
+            copyGameIdBtn.onclick = copyGameIdToClipboard;
+
+            publicGamesList.addEventListener('click', (e) => {
+                const joinButton = e.target.closest('.join-lobby-btn');
+                if (joinButton) joinGame(joinButton.dataset.gameId);
+            });
+        }
+
+        function copyGameIdToClipboard() {
+            const gameIdText = gameIdDisplay.textContent;
+            if (!gameIdText) return;
+
+            const textArea = document.createElement("textarea");
+            textArea.value = gameIdText;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast(`Copied Lobby Code: ${gameIdText}`);
+                playSound('click');
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                showToast('Error: Could not copy code.');
+                playSound('error');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- GAME LOGIC ---
+
+        function listenForPublicGames() {
+            if (publicGamesUnsubscribe) publicGamesUnsubscribe();
+
+            const gamesRef = collection(db, `artifacts/${appId}/public/data/mastermind_games`);
+            const q = query(gamesRef, where("gameState.status", "==", "lobby"), where("masterOnline", "==", true));
+
+            publicGamesUnsubscribe = onSnapshot(q, (snapshot) => {
+                if (snapshot.empty) {
+                    publicGamesList.innerHTML = '<p class="text-terminal-amber/80">No online public games found. Create one!</p>';
+                    return;
+                }
+
+                let gamesHTML = '';
+                snapshot.forEach(doc => {
+                    const game = doc.data();
+                    // Defensive coding: ensure nested objects exist before accessing them.
+                    const players = game.players || {};
+                    const gameState = game.gameState || {};
+                    const masterId = gameState.masterId;
+                    const masterName = (masterId && players[masterId]) ? players[masterId].name : 'Unknown Master';
+                    const playerCount = Object.keys(players).length;
+                    
+                    gamesHTML += `
+                        <div class="flex justify-between items-center p-2 border-b border-terminal-green/30">
+                            <div>
+                                <p class="text-white font-bold">Lobby ID: <span class="text-terminal-amber">${doc.id}</span></p>
+                                <p class="text-sm">Master: ${masterName} | Players: ${playerCount}</p>
+                            </div>
+                            <button class="terminal-button text-base !p-2 join-lobby-btn" data-game-id="${doc.id}">Join</button>
+                        </div>
+                    `;
+                });
+                publicGamesList.innerHTML = gamesHTML;
+            }, (error) => {
+                console.error("Error listening for public games:", error);
+                publicGamesList.innerHTML = '<p class="text-red-500">Error loading games.</p>';
+            });
+        }
+
+        async function createGame() {
+            playSound('click');
+            const gameId = `GAME${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, gameId);
+            const currentUser = auth.currentUser;
+            const initialGameState = {
+                isSinglePlayer: false, // Explicitly set for multiplayer
+                masterOnline: true,
+                settings: { codeLength: 4, numRounds: 3, turnTimer: 30, allowDuplicates: false, unlimitedRounds: false, allowHints: true },
+                players: {
+                    [userId]: { name: currentUser.displayName, photoURL: currentUser.photoURL, score: 0, isMaster: true, joinedAt: Date.now(), ready: true, hintCooldown: 0 }
+                },
+                gameState: { status: 'lobby', currentRound: 1, masterId: userId, currentPlayerId: null, secretCode: [], timer: 30, roundWinner: null },
+                guesses: [],
+            };
+            try {
+                await setDoc(gameRef, initialGameState);
+                await joinGame(gameId);
+            } catch (error) {
+                console.error("Error creating game:", error);
+                showToast("Error: Could not create game.");
+            }
+        }
+
+        function createSinglePlayerGame() {
+            playSound('click');
+            const currentUser = auth.currentUser;
+            
+            const code = [];
+            const availableDigits = [...DIGITS];
+            for (let i = 0; i < 4; i++) {
+                const randIndex = Math.floor(Math.random() * availableDigits.length);
+                code.push(availableDigits[randIndex]);
+                availableDigits.splice(randIndex, 1);
+            }
+
+            currentGameState = {
+                id: 'SINGLE_PLAYER',
+                isSinglePlayer: true,
+                settings: { codeLength: 4, numRounds: 1, turnTimer: 999, allowDuplicates: false, unlimitedRounds: true, allowHints: true },
+                players: {
+                    [userId]: { name: currentUser.displayName, photoURL: currentUser.photoURL, score: 0, isMaster: false, joinedAt: Date.now(), ready: true, hintCooldown: 0 },
+                    'COMPUTER': { name: 'The Machine', photoURL: `https://placehold.co/48x48/0d0d0d/d89300?text=M`, score: 0, isMaster: true, joinedAt: Date.now(), ready: true }
+                },
+                gameState: { status: 'playing', currentRound: 1, masterId: 'COMPUTER', currentPlayerId: userId, secretCode: code, timer: 999, roundWinner: null },
+                guesses: []
+            };
+            
+            lobbyScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            updateUI();
+        }
+
+        async function joinGame(id) {
+            playSound('click');
+            if (!id) {
+                showToast("Please enter a Game ID.");
+                return;
+            }
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, id);
+            try {
+                const gameSnap = await getDoc(gameRef);
+                if (!gameSnap.exists()) {
+                    showToast("Game ID not found.");
+                    return;
+                }
+                
+                const currentUser = auth.currentUser;
+                const currentPlayers = gameSnap.data().players;
+                if (!currentPlayers[userId]) {
+                    if (gameSnap.data().gameState.status !== 'lobby') {
+                        showToast("Cannot join game that is already in progress.");
+                        return;
+                    }
+                    await updateDoc(gameRef, {
+                        [`players.${userId}`]: { name: currentUser.displayName, photoURL: currentUser.photoURL, score: 0, isMaster: false, joinedAt: Date.now(), ready: false, hintCooldown: 0 }
+                    });
+                }
+                if (gameUnsubscribe) gameUnsubscribe();
+                gameUnsubscribe = onSnapshot(gameRef, (doc) => {
+                    const newGameState = doc.data();
+                    if (!newGameState || !newGameState.players[userId]) {
+                        leaveGame(newGameState && !newGameState.players[userId]);
+                        return;
+                    }
+                    
+                    newGameState.id = doc.id; // Add the actual document ID to the state object
+                    const oldGameState = currentGameState; 
+                    currentGameState = newGameState;
+
+                    const wasPlaying = oldGameState.gameState?.status === 'playing';
+                    const isNowPlaying = newGameState.gameState.status === 'playing';
+
+                    const roundHasStarted = isNowPlaying && !wasPlaying;
+                    const turnHasChanged = isNowPlaying && oldGameState.gameState?.currentPlayerId !== newGameState.gameState.currentPlayerId;
+
+                    if ((roundHasStarted || turnHasChanged) && newGameState.gameState.masterId === userId) {
+                        resetTimer(); 
+                    }
+
+                    updateUI();
+                });
+
+                if (publicGamesUnsubscribe) publicGamesUnsubscribe();
+                lobbyScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error joining game: ", error);
+                showToast("Failed to join game.");
+            }
+        }
+        
+        async function endGameByMaster() {
+            if (!currentGameState.id || currentGameState.gameState?.masterId !== userId) return;
+            playSound('error');
+            showConfirmModal("Are you sure you want to end this game for all players?", async () => {
+                const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+                await deleteDoc(gameRef);
+            });
+        }
+
+        function leaveGame(wasKicked = false) {
+            if (gameUnsubscribe) gameUnsubscribe();
+            gameUnsubscribe = null;
+            currentGameState = {};
+            if(turnTimerInterval) clearInterval(turnTimerInterval);
+            
+            gameScreen.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            modeSelectionScreen.classList.remove('hidden');
+            publicLobbyScreen.classList.add('hidden');
+            
+            const message = wasKicked ? "You were kicked from the game." : "You left the game or it was ended.";
+            showToast(message);
+        }
+
+        async function kickPlayer(playerToKickId) {
+            if (!currentGameState.id || currentGameState.gameState?.masterId !== userId || currentGameState.gameState?.status !== 'lobby') return;
+            if (playerToKickId === userId) return;
+            
+            playSound('error');
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+            await updateDoc(gameRef, {
+                [`players.${playerToKickId}`]: deleteField()
+            });
+            showToast(`Kicked ${currentGameState.players[playerToKickId].name}.`);
+        }
+        
+        async function togglePlayerReady() {
+            if (!currentGameState.id || currentGameState.players[userId].isMaster) return;
+            playSound('click');
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+            const currentReadyStatus = currentGameState.players[userId].ready;
+            await updateDoc(gameRef, {
+                [`players.${userId}.ready`]: !currentReadyStatus
+            });
+        }
+
+        async function assignNewMaster(newMasterId) {
+            if (!currentGameState.id || currentGameState.gameState.masterId !== userId || userId === newMasterId) return;
+            
+            playSound('submit');
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameSnap = await transaction.get(gameRef);
+                    if (!gameSnap.exists()) throw "Game not found";
+
+                    const gameData = gameSnap.data();
+                    const oldMasterId = gameData.gameState.masterId;
+                    
+                    transaction.update(gameRef, {
+                        [`players.${oldMasterId}.isMaster`]: false,
+                        [`players.${oldMasterId}.ready`]: false,
+                        [`players.${newMasterId}.isMaster`]: true,
+                        [`players.${newMasterId}.ready`]: true,
+                        'gameState.masterId': newMasterId
+                    });
+                });
+                showToast("New Game Master assigned!");
+            } catch (error) {
+                console.error("Failed to assign new master:", error);
+                showToast("Error assigning new master.");
+            }
+        }
+        
+        function updateMasterControlsUI(isMaster, status) {
+            const isSinglePlayer = !!currentGameState.isSinglePlayer;
+            masterControls.classList.toggle('hidden', !isMaster || isSinglePlayer);
+            if (!isMaster) return;
+
+            const isLobby = status === 'lobby';
+            const isPlaying = status === 'playing';
+            const isRoundOver = status === 'roundOver';
+
+            startGameBtn.classList.toggle('hidden', !isLobby);
+            setCodeContainer.classList.toggle('hidden', !isLobby);
+            nextRoundBtn.classList.toggle('hidden', !isRoundOver);
+            backToLobbyBtn.classList.toggle('hidden', isLobby);
+            endGameBtn.classList.toggle('hidden', isLobby);
+        }
+
+        function updateUI() {
+            if (!currentGameState.gameState) return;
+            
+            const { settings, players, gameState, guesses, id } = currentGameState;
+            const isSinglePlayer = !!currentGameState.isSinglePlayer;
+            const isMaster = !isSinglePlayer && gameState.masterId === userId;
+            const myTurn = gameState.currentPlayerId === userId;
+            
+            gameIdDisplay.textContent = isSinglePlayer ? "PRACTICE" : id;
+            lobbyCodeHeader.textContent = isSinglePlayer ? "MODE:" : "Lobby Code:";
+            copyGameIdBtn.classList.toggle('hidden', isSinglePlayer);
+            playerInfoPanel.classList.toggle('hidden', isSinglePlayer);
+            
+            const roundText = settings.unlimitedRounds ? `${gameState.currentRound}` : `${gameState.currentRound} / ${settings.numRounds}`;
+            roundDisplay.textContent = roundText;
+            timerDisplay.textContent = gameState.timer;
+
+            const sortedPlayerEntries = Object.entries(players).sort((a, b) => a[1].joinedAt - b[1].joinedAt);
+            playerList.innerHTML = sortedPlayerEntries.map(([playerId, player]) => {
+                let readyStatusHTML = '';
+                let masterControlsHTML = '';
+
+                if (gameState.status === 'lobby') {
+                    if (player.isMaster) {
+                        readyStatusHTML = '<span class="text-terminal-amber">[M]</span>';
+                    } else if (player.ready) {
+                        readyStatusHTML = '<span class="text-terminal-green">[Ready]</span>';
+                    } else {
+                        if (playerId === userId) {
+                            readyStatusHTML = '<button class="terminal-button text-base !p-1 ready-btn">Ready Up</button>';
+                        } else {
+                            readyStatusHTML = '<span class="text-terminal-amber">[Not Ready]</span>';
+                        }
+                    }
+
+                    if (isMaster && playerId !== userId) {
+                        masterControlsHTML += `<button class="kick-button" data-player-id="${playerId}" title="Kick Player">&times;</button>`;
+                        masterControlsHTML += `<button class="terminal-button text-xs !p-1 ml-2 make-master-btn" data-player-id="${playerId}">Make Master</button>`;
+                    }
+                }
+
+                return `
+                    <div class="flex justify-between items-center p-2 ${gameState.currentPlayerId === playerId ? 'bg-terminal-green/20' : ''}">
+                        <div class="flex items-center">
+                            <img src="${player.photoURL || `https://placehold.co/32x32/0d0d0d/0abb3a?text=${(player.name || 'A').charAt(0)}`}" class="w-8 h-8 rounded-full mr-3 border border-terminal-green/50">
+                            <span class="truncate">${player.name} ${playerId === userId && !player.isMaster ? '(You)' : ''}</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-terminal-amber">${player.score} pts</span>
+                            ${readyStatusHTML}
+                            ${masterControlsHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            guessHistory.innerHTML = guesses.filter(g => g.round === gameState.currentRound).map(g => `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <span class="w-28 truncate">${players[g.playerId]?.name || '???'}:</span>
+                        <div class="flex space-x-2 text-2xl font-bold text-white guess-number-display">
+                            ${g.guess.join('')}
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 text-xl">
+                        ${g.isHint ? '<span class="text-blue-400">[HINT]</span>' : ''}
+                        ${Array(g.bulls).fill('<span class="text-green-500">●</span>').join('')}
+                        ${Array(g.cows).fill('<span class="text-yellow-500">●</span>').join('')}
+                    </div>
+                </div>
+            `).join('');
+            guessHistory.scrollTop = guessHistory.scrollHeight;
+
+            switch(gameState.status) {
+                case 'lobby': lobbyUI(isMaster, players); break;
+                case 'playing': playingUI(isMaster, myTurn, gameState, settings); break;
+                case 'roundOver': roundOverUI(isMaster, gameState); break;
+                case 'gameOver': gameOverUI(players); break;
+            }
+        }
+        
+        function lobbyUI(isMaster, players) {
+            updateMasterControlsUI(isMaster, 'lobby');
+            document.getElementById('settings-panel').classList.toggle('hidden', !isMaster);
+            
+            guessInput.disabled = true;
+            submitGuessBtn.disabled = true;
+            requestHintBtn.disabled = true;
+            secretCodeReveal.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+
+            if (isMaster) {
+                const allReady = Object.values(players).every(p => p.ready);
+                startGameBtn.disabled = !allReady;
+                turnStatus.textContent = allReady ? 'All players are ready!' : 'Waiting for players to ready up...';
+
+                const settings = currentGameState.settings;
+                document.getElementById('code-length').value = settings.codeLength;
+                document.getElementById('num-rounds').value = settings.numRounds;
+                document.getElementById('turn-timer').value = settings.turnTimer;
+                document.getElementById('advanced-mode').checked = settings.allowDuplicates;
+                document.getElementById('unlimited-rounds').checked = settings.unlimitedRounds;
+                document.getElementById('allow-hints').checked = settings.allowHints;
+            } else {
+                turnStatus.textContent = 'Waiting for Master to start...';
+            }
+        }
+
+        function playingUI(isMaster, myTurn, gameState, settings) {
+            updateMasterControlsUI(isMaster, 'playing');
+            document.getElementById('settings-panel').classList.add('hidden');
+            secretCodeReveal.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+
+            const myCooldown = currentGameState.players[userId]?.hintCooldown || 0;
+            const hintsDisabledByMaster = !settings.allowHints;
+
+            requestHintBtn.disabled = !myTurn || hintsDisabledByMaster || myCooldown > 0;
+            if (hintsDisabledByMaster) {
+                requestHintBtn.title = "Hints are disabled by the Master for this game.";
+            } else {
+                requestHintBtn.title = "";
+            }
+
+            if (myTurn) {
+                turnStatus.textContent = "It's your turn!";
+                guessInput.disabled = false;
+                submitGuessBtn.disabled = false;
+                requestHintBtn.textContent = myCooldown > 0 ? `Hint (${myCooldown})` : 'Hint';
+                guessInput.maxLength = settings.codeLength;
+                if (document.activeElement !== guessInput) { guessInput.focus(); }
+            } else {
+                const currentPlayerName = currentGameState.players[gameState.currentPlayerId]?.name || '...';
+                turnStatus.textContent = `Waiting for ${currentPlayerName} to guess...`;
+                guessInput.disabled = true;
+                submitGuessBtn.disabled = true;
+                requestHintBtn.textContent = 'Hint';
+            }
+        }
+        
+        function roundOverUI(isMaster, gameState) {
+            updateMasterControlsUI(isMaster, 'roundOver');
+            if(turnTimerInterval) clearInterval(turnTimerInterval);
+
+            if (gameState.roundWinner) {
+                const winnerName = currentGameState.players[gameState.roundWinner]?.name || 'A player';
+                turnStatus.textContent = `${winnerName} won the round!`;
+            } else {
+                 turnStatus.textContent = `Nobody guessed the code!`;
+            }
+
+            guessInput.disabled = true;
+            submitGuessBtn.disabled = true;
+            requestHintBtn.disabled = true;
+            
+            secretCodeReveal.classList.remove('hidden');
+            secretCodeContainer.innerHTML = gameState.secretCode.map((d, i) => 
+                `<span class="text-white digit-reveal" style="animation-delay: ${i * 0.2}s">${d}</span>`
+            ).join('');
+            
+            const { settings } = currentGameState;
+            const isLastRound = !settings.unlimitedRounds && gameState.currentRound >= settings.numRounds;
+            if (isMaster) {
+                if (isLastRound) {
+                    nextRoundBtn.textContent = "Show Final Scores";
+                } else if (settings.unlimitedRounds) {
+                    nextRoundBtn.textContent = "End Game";
+                } else {
+                    nextRoundBtn.textContent = "Next Round";
+                }
+            }
+        }
+
+        function gameOverUI(players) {
+            gameOverScreen.classList.remove('hidden');
+            const masterGameOverControls = document.getElementById('master-game-over-controls');
+            const spPlayAgainBtn = document.getElementById('play-again-btn-sp');
+            const waitMsg = document.getElementById('play-again-wait-msg');
+
+            const sortedPlayerEntries = Object.entries(players).sort((a, b) => b[1].score - a[1].score);
+            
+            if (sortedPlayerEntries.length > 0) {
+                const [winnerId, winnerData] = sortedPlayerEntries[0];
+                finalScores.innerHTML = sortedPlayerEntries.map(([id, p]) => `<p>${p.name}: ${p.score} points</p>`).join('');
+                finalWinner.textContent = winnerData.name;
+                // Set the winnerId on the master's play again button for the resetGame function
+                document.getElementById('play-again-btn-master').dataset.winnerId = winnerId;
+            } else {
+                finalScores.innerHTML = '<p>No players left to score.</p>';
+                finalWinner.textContent = 'Nobody';
+            }
+            
+            const isMaster = !currentGameState.isSinglePlayer && currentGameState.gameState.masterId === userId;
+
+            // Hide all controls first
+            masterGameOverControls.classList.add('hidden');
+            spPlayAgainBtn.classList.add('hidden');
+            waitMsg.classList.add('hidden');
+
+            if (currentGameState.isSinglePlayer) {
+                spPlayAgainBtn.classList.remove('hidden');
+            } else if (isMaster) {
+                masterGameOverControls.classList.remove('hidden');
+            } else {
+                waitMsg.classList.remove('hidden');
+            }
+        }
+
+        async function startGame() {
+            playSound('click');
+            if (Object.keys(currentGameState.players).length < 2) {
+                showToast("Cannot start game. At least one other player must join.");
+                playSound('error');
+                return;
+            }
+            
+            const settings = {
+                codeLength: parseInt(document.getElementById('code-length').value),
+                numRounds: parseInt(document.getElementById('num-rounds').value),
+                turnTimer: parseInt(document.getElementById('turn-timer').value),
+                allowDuplicates: document.getElementById('advanced-mode').checked,
+                unlimitedRounds: document.getElementById('unlimited-rounds').checked,
+                allowHints: document.getElementById('allow-hints').checked,
+            };
+            
+            const masterCodeStr = setCodeInput.value.trim();
+            let masterCode = null;
+            if (masterCodeStr) {
+                if (masterCodeStr.length !== settings.codeLength) { showToast(`Code must be ${settings.codeLength} digits long.`); return; }
+                if (masterCodeStr.split('').some(d => !DIGITS.includes(d))) { showToast("Code can only contain digits 0-9."); return; }
+                if (!settings.allowDuplicates && new Set(masterCodeStr).size !== masterCodeStr.length) { showToast("Code cannot have duplicate digits in normal mode."); return; }
+                masterCode = masterCodeStr.split('');
+            }
+            
+            await startNextRound({ newSettings: settings, masterSetCode: masterCode });
+        }
+        
+        async function startNextRound(options = {}) {
+            const { newSettings, masterSetCode } = options;
+            playSound('click');
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameSnap = await transaction.get(gameRef);
+                    if (!gameSnap.exists()) { throw "Game does not exist!"; }
+                    
+                    let state = gameSnap.data();
+
+                    if (newSettings) {
+                        state.settings = { ...state.settings, ...newSettings };
+                    }
+                    
+                    const { settings, gameState, players } = state;
+
+                    const isLastRound = !settings.unlimitedRounds && gameState.currentRound >= settings.numRounds;
+                    if (!newSettings && gameState.status === 'roundOver' && (isLastRound || settings.unlimitedRounds)) {
+                        transaction.update(gameRef, { 'gameState.status': 'gameOver' });
+                        return;
+                    }
+
+                    const newRound = gameState.status === 'lobby' ? 1 : gameState.currentRound + 1;
+
+                    let code = masterSetCode || [];
+                    if (!masterSetCode) {
+                        const availableDigits = [...DIGITS];
+                        for (let i = 0; i < settings.codeLength; i++) {
+                            const randIndex = Math.floor(Math.random() * availableDigits.length);
+                            code.push(availableDigits[randIndex]);
+                            if (!settings.allowDuplicates) {
+                                availableDigits.splice(randIndex, 1);
+                            }
+                        }
+                    }
+                    
+                    const guesserIds = Object.keys(players).filter(id => !players[id].isMaster);
+                    if (guesserIds.length === 0) throw "No guessers in the game.";
+                    
+                    const firstPlayerId = guesserIds[Math.floor(Math.random() * guesserIds.length)];
+
+                    transaction.update(gameRef, {
+                        'settings': settings,
+                        'gameState.status': 'playing',
+                        'gameState.currentRound': newRound,
+                        'gameState.secretCode': code,
+                        'gameState.currentPlayerId': firstPlayerId,
+                        'gameState.roundWinner': null
+                    });
+                });
+
+                const finalStateSnap = await getDoc(gameRef);
+                if (finalStateSnap.exists() && finalStateSnap.data().gameState.status === 'gameOver') {
+                    await updateLeaderboard();
+                    triggerConfetti();
+                    playSound('win', 'C5', '1n');
+                }
+
+            } catch (e) {
+                console.error("Start new round/game transaction failed: ", e);
+                showToast("Error starting the round. Check console for details.");
+            }
+        }
+        
+        function resetTimer() {
+            if (turnTimerInterval) clearInterval(turnTimerInterval);
+
+            const currentState = currentGameState; // Capture state at the moment the timer is supposed to start
+            
+            if (currentState.isSinglePlayer || currentState.gameState.masterId !== userId || currentState.gameState.status !== 'playing') {
+                return;
+            }
+
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentState.id);
+            let timeLeft = currentState.settings.turnTimer;
+
+            updateDoc(gameRef, { 'gameState.timer': timeLeft });
+
+            turnTimerInterval = setInterval(async () => {
+                timeLeft--;
+
+                // If game state has changed significantly (e.g., round over, different player), stop this timer.
+                if (currentGameState.gameState.status !== 'playing' || currentGameState.gameState.currentPlayerId !== currentState.gameState.currentPlayerId) {
+                    clearInterval(turnTimerInterval);
+                    return;
+                }
+                
+                if (timeLeft >= 0) {
+                    await updateDoc(gameRef, { 'gameState.timer': timeLeft });
+                }
+
+                if (timeLeft < 0) {
+                    clearInterval(turnTimerInterval);
+
+                    // Use a transaction to safely advance the turn if it hasn't changed.
+                    try {
+                        await runTransaction(db, async (transaction) => {
+                            const gameSnap = await transaction.get(gameRef);
+                            if (!gameSnap.exists()) return;
+
+                            const latestState = gameSnap.data();
+                            // Only advance the turn if the game is still playing and the current player is the one whose time ran out.
+                            if (latestState.gameState.status === 'playing' && latestState.gameState.currentPlayerId === currentState.gameState.currentPlayerId) {
+                                const guesserIds = Object.keys(latestState.players).filter(id => !latestState.players[id].isMaster);
+                                if (guesserIds.length > 0) {
+                                    const currentIndex = guesserIds.indexOf(latestState.gameState.currentPlayerId);
+                                    const nextIndex = (currentIndex + 1) % guesserIds.length;
+                                    const nextPlayerId = guesserIds[nextIndex];
+                                    
+                                    transaction.update(gameRef, { 
+                                        'gameState.currentPlayerId': nextPlayerId,
+                                    });
+                                 }
+                            }
+                        });
+                    } catch (e) {
+                        console.error("Timer turn advance transaction failed:", e);
+                    }
+                }
+            }, 1000);
+        }
+
+        async function requestHint() {
+            playSound('click', 'A4');
+            if (!currentGameState.settings.allowHints) {
+                showToast("Hints are disabled for this game.");
+                return;
+            }
+            if (currentGameState.isSinglePlayer) requestHintSinglePlayer();
+            else requestHintMultiplayer();
+        }
+
+        function requestHintSinglePlayer() {
+            const { players, gameState } = currentGameState;
+            const myGuesses = gameState.guesses.filter(g => g.playerId === userId && !g.isHint);
+            const allGuessedDigits = new Set(myGuesses.flatMap(g => g.guess));
+            const secretCodeDigits = new Set(gameState.secretCode);
+            const unknownDigits = [...secretCodeDigits].filter(d => !allGuessedDigits.has(d));
+
+            if (unknownDigits.length === 0) {
+                showToast("No new digit hints available!");
+                return;
+            }
+
+            const hintDigit = unknownDigits[Math.floor(Math.random() * unknownDigits.length)];
+            showToast(`Hint: The digit '${hintDigit}' is in the secret code.`);
+            
+            const hintRecord = { playerId: userId, guess: Array(currentGameState.settings.codeLength).fill('-'), isHint: true, bulls: 0, cows: 0, round: gameState.currentRound };
+            currentGameState.guesses.push(hintRecord);
+            players[userId].hintCooldown = 3; // Set cooldown (2 turns + current turn)
+            updateUI();
+        }
+
+        async function requestHintMultiplayer() {
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameSnap = await transaction.get(gameRef);
+                    if (!gameSnap.exists()) throw "Game does not exist!";
+                    
+                    const state = gameSnap.data();
+                    if (state.gameState.currentPlayerId !== userId) { showToast("Not your turn!"); return; }
+
+                    const myGuesses = state.guesses.filter(g => g.playerId === userId && !g.isHint);
+                    const allGuessedDigits = new Set(myGuesses.flatMap(g => g.guess));
+                    const secretCodeDigits = new Set(state.gameState.secretCode);
+                    const unknownDigits = [...secretCodeDigits].filter(d => !allGuessedDigits.has(d));
+
+                    if (unknownDigits.length === 0) { showToast("No new digit hints available!"); return; }
+
+                    const hintDigit = unknownDigits[Math.floor(Math.random() * unknownDigits.length)];
+                    showToast(`Hint: The digit '${hintDigit}' is in the secret code.`);
+
+                    const guesserIds = Object.keys(state.players).filter(id => !state.players[id].isMaster);
+                    const nextPlayerId = guesserIds[(guesserIds.indexOf(userId) + 1) % guesserIds.length];
+                    const hintRecord = { playerId: userId, guess: Array(state.settings.codeLength).fill('-'), isHint: true, bulls: 0, cows: 0, round: state.gameState.currentRound };
+
+                    transaction.update(gameRef, {
+                        'guesses': [...state.guesses, hintRecord],
+                        'gameState.currentPlayerId': nextPlayerId,
+                        [`players.${userId}.hintCooldown`]: 3 // Cooldown for 2 turns + current
+                    });
+                });
+            } catch (e) {
+                console.error("Hint request failed:", e);
+                showToast("Could not get a hint.");
+            }
+        }
+        
+        async function submitGuess() {
+            playSound('submit', 'C3');
+            if (currentGameState.isSinglePlayer) submitGuessSinglePlayer();
+            else submitGuessMultiplayer();
+        }
+
+        function validateGuess(guessStr, settings) {
+            inputError.textContent = '';
+            if (guessStr.length !== settings.codeLength) {
+                inputError.textContent = `Guess must be ${settings.codeLength} digits.`;
+                return false;
+            }
+            if (guessStr.split('').some(char => !DIGITS.includes(char))) {
+                inputError.textContent = `Invalid character. Use digits 0-9.`;
+                return false;
+            }
+            if (!settings.allowDuplicates && new Set(guessStr.split('')).size !== guessStr.length) {
+                inputError.textContent = `Duplicate digits are not allowed in normal mode.`;
+                return false;
+            }
+            return true;
+        }
+
+        function submitGuessSinglePlayer() {
+            const guessStr = guessInput.value.trim();
+            const { settings, gameState, players } = currentGameState;
+            if (!validateGuess(guessStr, settings)) { playSound('error'); return; }
+            
+            const guess = guessStr.split('');
+            const code = [...gameState.secretCode];
+            let tempGuess = [...guess], bulls = 0, cows = 0;
+
+            for (let i = tempGuess.length - 1; i >= 0; i--) {
+                if (tempGuess[i] === code[i]) { bulls++; tempGuess.splice(i, 1); code.splice(i, 1); }
+            }
+            for (let i = 0; i < tempGuess.length; i++) {
+                const codeIndex = code.indexOf(tempGuess[i]);
+                if (codeIndex > -1) { cows++; code.splice(codeIndex, 1); }
+            }
+            
+            const newGuess = { playerId: userId, guess, bulls, cows, round: gameState.currentRound };
+            currentGameState.guesses.push(newGuess);
+            if (players[userId].hintCooldown > 0) players[userId].hintCooldown--;
+
+            if (bulls === settings.codeLength) {
+                gameState.status = 'gameOver';
+                gameState.roundWinner = userId;
+                players[userId].score += 100;
+                playSound('win', 'C5', '2n');
+                triggerConfetti();
+            }
+            
+            guessInput.value = '';
+            updateUI();
+        }
+
+        async function submitGuessMultiplayer() {
+            const guessStr = guessInput.value.trim();
+            if (!validateGuess(guessStr, currentGameState.settings)) { playSound('error'); return; }
+            
+            submitGuessBtn.disabled = true;
+            requestHintBtn.disabled = true;
+            const guess = guessStr.split('');
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameSnap = await transaction.get(gameRef);
+                    if (!gameSnap.exists()) throw "Game does not exist!";
+                    
+                    const state = gameSnap.data();
+                    if (state.gameState.currentPlayerId !== userId) { showToast("Not your turn!"); return; }
+
+                    const code = [...state.gameState.secretCode];
+                    let tempGuess = [...guess], bulls = 0, cows = 0;
+                    for (let i = tempGuess.length - 1; i >= 0; i--) {
+                        if (tempGuess[i] === code[i]) { bulls++; tempGuess.splice(i, 1); code.splice(i, 1); }
+                    }
+                    for (let i = 0; i < tempGuess.length; i++) {
+                        const codeIndex = code.indexOf(tempGuess[i]);
+                        if (codeIndex > -1) { cows++; code.splice(codeIndex, 1); }
+                    }
+                    
+                    const newGuess = { playerId: userId, guess, bulls, cows, round: state.gameState.currentRound };
+                    const updatedGuesses = [...state.guesses, newGuess];
+                    const guesserIds = Object.keys(state.players).filter(id => !state.players[id].isMaster);
+                    const currentRoundGuesses = updatedGuesses.filter(g => g.round === state.gameState.currentRound && !g.isHint).length;
+                    const maxGuesses = guesserIds.length * (state.settings.codeLength * 2);
+                    
+                    const updates = { guesses: updatedGuesses };
+                    if ((state.players[userId].hintCooldown || 0) > 0) {
+                        updates[`players.${userId}.hintCooldown`] = state.players[userId].hintCooldown - 1;
+                    }
+
+                    if (bulls === state.settings.codeLength) {
+                        const score = Math.max(10, 100 - (currentRoundGuesses * 5));
+                        updates['gameState.status'] = 'roundOver';
+                        updates['gameState.roundWinner'] = userId;
+                        updates[`players.${userId}.score`] = (state.players[userId].score || 0) + score;
+                    } else if (guesserIds.length > 0 && currentRoundGuesses >= maxGuesses) {
+                         updates['gameState.status'] = 'roundOver';
+                         updates['gameState.roundWinner'] = state.gameState.masterId;
+                         updates[`players.${state.gameState.masterId}.score`] = (state.players[state.gameState.masterId].score || 0) + 50;
+                    } else {
+                        const nextIndex = (guesserIds.indexOf(userId) + 1) % guesserIds.length;
+                        updates['gameState.currentPlayerId'] = guesserIds[nextIndex];
+                    }
+                    transaction.update(gameRef, updates);
+                });
+                guessInput.value = '';
+            } catch (e) {
+                console.error("Guess transaction failed: ", e);
+                showToast("Error submitting guess. Please try again.");
+            } finally {
+                if (currentGameState.gameState?.currentPlayerId === userId) {
+                    submitGuessBtn.disabled = false;
+                    requestHintBtn.disabled = false;
+                }
+            }
+        }
+        
+        async function resetGame(backToLobby, newMasterId = null) {
+            playSound('error');
+            if (currentGameState.isSinglePlayer) {
+                leaveGame();
+                return;
+            }
+            if (currentGameState.gameState.masterId !== userId) return;
+            if (turnTimerInterval) clearInterval(turnTimerInterval);
+
+            const gameRef = doc(db, `artifacts/${appId}/public/data/mastermind_games`, currentGameState.id);
+            const players = currentGameState.players;
+            const masterIdForNewGame = newMasterId || userId;
+
+            Object.keys(players).forEach(id => {
+                players[id].score = 0;
+                const isNewMaster = id === masterIdForNewGame;
+                players[id].isMaster = isNewMaster;
+                players[id].ready = isNewMaster;
+                players[id].hintCooldown = 0;
+            });
+            
+            const resetState = {
+                isSinglePlayer: false, // Be explicit
+                masterOnline: true,    // Keep master online
+                settings: { codeLength: 4, numRounds: 3, turnTimer: 30, allowDuplicates: false, unlimitedRounds: false, allowHints: true },
+                players: players,
+                gameState: { status: 'lobby', currentRound: 1, masterId: masterIdForNewGame, currentPlayerId: null, secretCode: [], timer: 30, roundWinner: null },
+                guesses: []
+            };
+
+            await setDoc(gameRef, resetState);
+        }
+        
+        // --- LEADERBOARD & STATS ---
+        async function updateLeaderboard() {
+            if (currentGameState.isSinglePlayer) return;
+            const players = currentGameState.players;
+            if (Object.keys(players).length === 0) return;
+            const winnerId = Object.keys(players).reduce((a, b) => players[a].score > players[b].score ? a : b);
+            const batch = writeBatch(db);
+            for (const id in players) {
+                const playerStatRef = doc(db, `artifacts/${appId}/public/data/mastermind_leaderboard`, id);
+                try {
+                    const playerStatSnap = await getDoc(playerStatRef);
+                    let wins = playerStatSnap.exists() ? playerStatSnap.data().wins || 0 : 0;
+                    let gamesPlayed = (playerStatSnap.exists() ? playerStatSnap.data().gamesPlayed || 0 : 0) + 1;
+                    if (id === winnerId) wins++;
+                    batch.set(playerStatRef, { name: players[id].name, photoURL: players[id].photoURL, wins, gamesPlayed }, { merge: true });
+                } catch(e) { console.error("Could not update leaderboard for player ", id, e); }
+            }
+            await batch.commit();
+        }
+        
+        async function renderLeaderboard() {
+            const leaderboardCol = collection(db, `artifacts/${appId}/public/data/mastermind_leaderboard`);
+            const leaderboardSnap = await getDocs(leaderboardCol);
+            const leaderboardData = leaderboardSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            leaderboardData.sort((a,b) => b.wins - a.wins || a.gamesPlayed - b.gamesPlayed);
+            
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            if (leaderboardData.length === 0) {
+                leaderboardBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center">No stats yet. Play a game!</td></tr>`;
+            } else {
+                leaderboardBody.innerHTML = leaderboardData.map(p => `
+                    <tr class="border-b border-terminal-green/20">
+                        <td class="p-2 flex items-center">
+                            <img src="${p.photoURL || 'https://placehold.co/32x32/0d0d0d/0abb3a?text=?'}" class="w-8 h-8 rounded-full mr-3 border border-terminal-green/50">
+                            <span class="truncate">${p.name}</span>
+                        </td>
+                        <td class="p-2 text-center">${p.wins}</td>
+                        <td class="p-2 text-center">${p.gamesPlayed}</td>
+                    </tr>
+                `).join('');
+            }
+            document.getElementById('clear-stats-btn').classList.toggle('hidden', userId !== ADMIN_UID);
+        }
+        
+        async function renderPersonalStats() {
+            if (!userId) return;
+            const playerStatRef = doc(db, `artifacts/${appId}/public/data/mastermind_leaderboard`, userId);
+            const playerStatSnap = await getDoc(playerStatRef);
+
+            let wins = 0, gamesPlayed = 0, winRate = "0%";
+            if (playerStatSnap.exists()) {
+                const data = playerStatSnap.data();
+                wins = data.wins || 0;
+                gamesPlayed = data.gamesPlayed || 0;
+                if (gamesPlayed > 0) winRate = `${((wins / gamesPlayed) * 100).toFixed(1)}%`;
+            }
+            
+            document.getElementById('stats-wins').textContent = wins;
+            document.getElementById('stats-games').textContent = gamesPlayed;
+            document.getElementById('stats-win-rate').textContent = winRate;
+        }
+
+        async function clearLeaderboard() {
+            playSound('error');
+            showConfirmModal("ADMIN ACTION\nAre you sure you want to clear ALL leaderboard stats? This cannot be undone.", async () => {
+                const leaderboardCol = collection(db, `artifacts/${appId}/public/data/mastermind_leaderboard`);
+                const leaderboardSnap = await getDocs(leaderboardCol);
+                const batch = writeBatch(db);
+                leaderboardSnap.docs.forEach(doc => { batch.delete(doc.ref); });
+                await batch.commit();
+                showToast("Leaderboard cleared.");
+                renderLeaderboard();
+            });
+        }
+
+        async function clearStaleLobbies() {
+            if (userId !== ADMIN_UID) {
+                showToast("You are not authorized for this action.");
+                return;
+            }
+            playSound('error');
+            showToast("Scanning for stale lobbies...");
+
+            const gamesRef = collection(db, `artifacts/${appId}/public/data/mastermind_games`);
+            const q = query(gamesRef, where("gameState.status", "==", "lobby"));
+            const lobbySnapshot = await getDocs(q);
+
+            const batch = writeBatch(db);
+            let staleCount = 0;
+
+            for (const gameDoc of lobbySnapshot.docs) {
+                const gameData = gameDoc.data();
+                const players = gameData.players || {};
+                const playerIds = Object.keys(players);
+
+                if (playerIds.length === 0) {
+                    batch.delete(gameDoc.ref);
+                    staleCount++;
+                    continue;
+                }
+
+                let allOffline = true;
+                for (const pId of playerIds) {
+                    const statusRef = ref(rtdb, `status/${pId}`);
+                    const statusSnap = await get(statusRef);
+                    if (statusSnap.exists() && statusSnap.val().state === 'online') {
+                        allOffline = false;
+                        break; 
+                    }
+                }
+
+                if (allOffline) {
+                    batch.delete(gameDoc.ref);
+                    staleCount++;
+                }
+            }
+
+            if (staleCount > 0) {
+                await batch.commit();
+                showToast(`Cleared ${staleCount} stale lobbies.`);
+            } else {
+                showToast("No stale lobbies found.");
+            }
+        }
+
+        // --- INITIALIZE APP ---
+        window.onload = initialize;
+    </script>
+</body>
+</html>
