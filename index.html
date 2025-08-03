@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0abb3a"/>
     <title>MASTERMIND</title>
     <!-- Google Fonts for the retro theme -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,6 +35,19 @@
                 }
             }
         }
+    </script>
+    <script>
+      // Check if the browser supports service workers
+      if ('serviceWorker' in navigator) {
+        // Register our service worker when the page loads
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful:', registration);
+          }, err => {
+            console.log('ServiceWorker registration failed:', err);
+          });
+        });
+      }
     </script>
     <style>
         /* Custom animations and styles for the terminal aesthetic */

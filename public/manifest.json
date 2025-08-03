@@ -1,0 +1,21 @@
+{
+  "name": "Mastermind - Code Breaker Game",
+  "short_name": "Mastermind",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0abb3a",
+  "description": "A retro-themed code-breaking game of logic and deduction.",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
